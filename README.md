@@ -6,6 +6,57 @@ type and a fix path, and safety issues can never be triaged below `Safety_Urgent
 The rules are Pydantic models, so a request type or fix path outside the allowed values is
 rejected, as is a fix path that doesn't belong to its request type.
 
+## The prompt
+
+This project was written with Claude Code from this prompt:
+
+> Write the following urgency rules as a Pydantic model in a new Python repo for a Tesla
+> fault message triage system that reads a csv file containing info like fault codes,
+> messages, subjects, names, etc. and sorts their urgency. The important column names are
+> vehicle_alert_code, message_subject, and message_text:
+>
+> Request types:\
+> Safety_Urgent: Urgent safety issue, requires tesla pickup, applies to any safety fault
+> codes and if messages reference a safety component like brakes or steering. Messages that
+> reference safety components don't need a fault code.\
+> Soon: requires service visit\
+> Routine: requires either remote-fix or customer visit
+>
+> Each request will use one of the following fix_paths:
+>
+> Tesla pickup\
+> Service visit\
+> Remote-fix\
+> Customer visit
+>
+> Fault codes are the following:
+>
+> ABS_w002\
+> BRK_a001\
+> BRK_w003\
+> EPAS_a191\
+> EPAS_w202\
+> ESP_w003
+>
+> Ensure all request types and fix paths are fixed allowed values.
+
+## One change I made, and why
+
+**Change:** I had the text rules tightened after the first version was checked against a
+real overnight batch of 300 fault messages.
+
+**Why:** In that batch, 60 messages had been checked by hand and confirmed as safety
+faults. The first version only looked for words like "brake" and "steering". That missed
+11 of the 60: customers who described brake trouble without naming the brakes ("the pedal
+feels soft", "the car tugs left when stopping", "grinding at the lights"). It also flagged
+7 routine messages, such as a touchscreen reboot or a suspension clunk, only because the
+customer added "brakes and steering feel normal". Each of those would have triggered an
+unnecessary Tesla pickup.
+
+**Result:** Brake symptoms now count as brake references, and mentions that only say a
+component is fine are ignored (see below). The tightened rules catch all 60 confirmed
+safety faults and no longer flag the 7 reassurance-only messages.
+
 ## Urgency rules
 
 | Request type    | Fix path                       | When                                                                    |
